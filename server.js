@@ -41,9 +41,6 @@ async function run() {
         const ordersCollection = database.collection('orders');
         const paymentCollection = database.collection("payments");
 
-
-
-
         const verifyAdmin = async (req, res, next) => {
             const requester = req.decoded.email;
             const requesterAccount = await userCollection.findOne({ email: requester });
@@ -160,23 +157,6 @@ async function run() {
             if (user === decodedUser) {
                 const query = { user }
                 const orders = await ordersCollection.find(query).toArray();
-
-                // const productsId = orders.map(order => ObjectID(order.productId));
-                // const productquantity = orders.map(order => order.quantity);
-                // const status = orders.map(order => order.status);
-
-                // const products = await productCollection.find({ _id: { $in: productsId } }).toArray();
-
-                // for (let i = 0; i < products.length; i++) {
-                //     products[i].quantity = productquantity[i];
-                //     products[i].status = status[i];
-                //     products[i]._id = orders[i]._id;
-                // }
-
-                // const finalProducts = products.map(product => {
-                //     const { _id, name, quantity, price, status } = product;
-                //     return { _id, name, quantity, price, status }
-                // })
                 return res.json(orders)
             }
 
@@ -321,9 +301,6 @@ async function run() {
             }
 
         });
-
-
-
 
     }
     finally {
