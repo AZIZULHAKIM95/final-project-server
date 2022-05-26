@@ -86,6 +86,17 @@ async function run() {
             res.json(result);
 
         })
+        // Check Is admin
+        app.get("/user/admin/:email",verifyJWT,verifyAdmin,async(req,res)=>{
+            const email = req.params.email;
+            const user = await userCollection.findOne({email})
+            if(user.role){
+                res.send({admin:true})
+            }
+            else{
+                res.send({admin:false})
+            }
+        })
 
 
 
@@ -103,6 +114,16 @@ async function run() {
             });
         });
 
+        // Delete Product
+        app.delete("/product/:id",verifyJWT,verifyAdmin,async(req,res)=>{
+            const productId = req.params.id;
+            const result = await productCollection.deleteOne({_id:ObjectID(productId)});
+            console.log(result);
+            res.json(result);
+
+        })
+
+        // Add new product
         app.post("/products", verifyJWT, verifyAdmin, async (req, res) => {
             const product = req.body;
             const result = await productCollection.insertOne(product);
@@ -121,6 +142,7 @@ async function run() {
             if (user === decodedUser) {
                 const query = { user }
                 const orders = await ordersCollection.find(query).toArray();
+
                 const productsId = orders.map(order => ObjectID(order.productId));
                 const productquantity = orders.map(order => order.quantity);
                 const status = orders.map(order => order.status);
@@ -130,6 +152,7 @@ async function run() {
                 for (let i = 0; i < products.length; i++) {
                     products[i].quantity = productquantity[i];
                     products[i].status = status[i];
+                    products[i]._id = orders[i]._id;
                 }
 
                 const finalProducts = products.map(product => {
@@ -144,6 +167,33 @@ async function run() {
                     message: "Forbidden Access"
                 })
             }
+        })
+
+        // Delete ordered product
+        app.delete("/order/:id/:type",verifyJWT, async(req,res)=>{
+            const {id:orderId,type} = req.params;
+            
+            if(type==="cancel"){
+                const orderDelete = await ordersCollection.findOne({_id:ObjectID(orderId)});
+                const {deletedCount} = await ordersCollection.deleteOne({_id:ObjectID(orderId)})
+                if(deletedCount){
+                    const filter = {_id:ObjectID(orderDelete.productId)}
+                    const updateDoc = {
+                        $inc:{
+                            stock:orderDelete.quantity
+                        }
+                    }
+                    const productInc = await productCollection.updateOne(filter,updateDoc);
+                    return res.send({success:true});
+                }
+            }
+            else if(type==="delete"){
+                const {deletedCount} = await ordersCollection.deleteOne({_id:ObjectID(orderId)})
+                if(deletedCount){
+                    return res.send({success:true})
+                }
+            }
+            res.send({success:false})
         })
 
         // REVIEW SECTION
