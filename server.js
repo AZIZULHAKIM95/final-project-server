@@ -4,9 +4,9 @@ const jwt = require('jsonwebtoken');
 
 require('dotenv').config();
 const { MongoClient, ServerApiVersion, ObjectID } = require('mongodb');
-const { verifyJWT} = require('./utils');
+const { verifyJWT } = require('./utils');
 
-// const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 
 const app = express();
 const port = process.env.PORT || 5000;
@@ -39,6 +39,9 @@ async function run() {
         const productCollection = database.collection("products");
         const reviewCollection = database.collection("reviews");
         const ordersCollection = database.collection('orders');
+        const paymentCollection = database.collection("payments");
+
+
 
 
         const verifyAdmin = async (req, res, next) => {
@@ -48,10 +51,24 @@ async function run() {
                 next();
             }
             else {
-                res.status(403).send({ message: 'forbidden' });
+                res.send({ message: 'forbidden' });
             }
         }
 
+        // Payment
+        app.post('/create-payment-intent', verifyJWT, async (req, res) => {
+            const service = req.body; 
+            const price = service.price; 
+            const amount = price * 100; 
+            const paymentIntent = await stripe.paymentIntents.create(
+                { 
+                    amount: amount, 
+                    currency: 'usd', 
+                    payment_method_types: ['card'] 
+                }
+            );    
+            res.send({ clientSecret: paymentIntent.client_secret }) 
+        });
 
         // USER HANDLE
         app.put('/user/:email', async (req, res) => {
@@ -67,34 +84,35 @@ async function run() {
         });
 
         // GET ALL USERS
-        app.get("/user",verifyJWT,verifyAdmin,async(req,res)=>{
+        app.get("/user", verifyJWT, verifyAdmin, async (req, res) => {
             const users = await userCollection.find({}).toArray();
             res.json(users);
         })
 
         // Make admin 
-        app.put("/user/admin/:email",verifyJWT,verifyAdmin, async(req,res)=>{
-            const {email,role} = req.body;
-            const filter = {email}
+        app.put("/user/admin/:email", verifyJWT, verifyAdmin, async (req, res) => {
+            const { email, role } = req.body;
+            const filter = { email }
             const updateDoc = {
-                $set:{
-                    role:role
+                $set: {
+                    role: role
                 }
             }
-            const result = await userCollection.updateOne(filter,updateDoc);
+            const result = await userCollection.updateOne(filter, updateDoc);
 
             res.json(result);
 
         })
         // Check Is admin
-        app.get("/user/admin/:email",verifyJWT,verifyAdmin,async(req,res)=>{
+        app.get("/user/admin/:email", verifyJWT, verifyAdmin, async (req, res) => {
             const email = req.params.email;
-            const user = await userCollection.findOne({email})
-            if(user.role){
-                res.send({admin:true})
+            const user = await userCollection.findOne({ email })
+
+            if (user.role) {
+                res.send({ admin: true })
             }
-            else{
-                res.send({admin:false})
+            else {
+                res.send({ admin: false })
             }
         })
 
@@ -115,9 +133,9 @@ async function run() {
         });
 
         // Delete Product
-        app.delete("/product/:id",verifyJWT,verifyAdmin,async(req,res)=>{
+        app.delete("/product/:id", verifyJWT, verifyAdmin, async (req, res) => {
             const productId = req.params.id;
-            const result = await productCollection.deleteOne({_id:ObjectID(productId)});
+            const result = await productCollection.deleteOne({ _id: ObjectID(productId) });
             console.log(result);
             res.json(result);
 
@@ -128,8 +146,8 @@ async function run() {
             const product = req.body;
             const result = await productCollection.insertOne(product);
             res.json({
-                success:true,
-                data:result
+                success: true,
+                data: result
             })
         })
 
@@ -143,23 +161,23 @@ async function run() {
                 const query = { user }
                 const orders = await ordersCollection.find(query).toArray();
 
-                const productsId = orders.map(order => ObjectID(order.productId));
-                const productquantity = orders.map(order => order.quantity);
-                const status = orders.map(order => order.status);
+                // const productsId = orders.map(order => ObjectID(order.productId));
+                // const productquantity = orders.map(order => order.quantity);
+                // const status = orders.map(order => order.status);
 
-                const products = await productCollection.find({ _id: { $in: productsId } }).toArray();
+                // const products = await productCollection.find({ _id: { $in: productsId } }).toArray();
 
-                for (let i = 0; i < products.length; i++) {
-                    products[i].quantity = productquantity[i];
-                    products[i].status = status[i];
-                    products[i]._id = orders[i]._id;
-                }
+                // for (let i = 0; i < products.length; i++) {
+                //     products[i].quantity = productquantity[i];
+                //     products[i].status = status[i];
+                //     products[i]._id = orders[i]._id;
+                // }
 
-                const finalProducts = products.map(product => {
-                    const { _id, name, quantity, price, status } = product;
-                    return { _id, name, quantity, price, status }
-                })
-                return res.json(finalProducts)
+                // const finalProducts = products.map(product => {
+                //     const { _id, name, quantity, price, status } = product;
+                //     return { _id, name, quantity, price, status }
+                // })
+                return res.json(orders)
             }
 
             else {
@@ -169,31 +187,40 @@ async function run() {
             }
         })
 
+        // Get A single product
+        app.get('/order/:id', verifyJWT, async(req, res) =>{ 
+            const id = req.params.id; 
+            const query = {_id: ObjectID(id)}; 
+            const order = await ordersCollection.findOne(query); 
+            // console.log(order);
+            res.send(order); 
+        })
+
         // Delete ordered product
-        app.delete("/order/:id/:type",verifyJWT, async(req,res)=>{
-            const {id:orderId,type} = req.params;
-            
-            if(type==="cancel"){
-                const orderDelete = await ordersCollection.findOne({_id:ObjectID(orderId)});
-                const {deletedCount} = await ordersCollection.deleteOne({_id:ObjectID(orderId)})
-                if(deletedCount){
-                    const filter = {_id:ObjectID(orderDelete.productId)}
+        app.delete("/order/:id/:type", verifyJWT, async (req, res) => {
+            const { id: orderId, type } = req.params;
+
+            if (type === "cancel") {
+                const orderDelete = await ordersCollection.findOne({ _id: ObjectID(orderId) });
+                const { deletedCount } = await ordersCollection.deleteOne({ _id: ObjectID(orderId) })
+                if (deletedCount) {
+                    const filter = { _id: ObjectID(orderDelete.productId) }
                     const updateDoc = {
-                        $inc:{
-                            stock:orderDelete.quantity
+                        $inc: {
+                            stock: orderDelete.quantity
                         }
                     }
-                    const productInc = await productCollection.updateOne(filter,updateDoc);
-                    return res.send({success:true});
+                    const productInc = await productCollection.updateOne(filter, updateDoc);
+                    return res.send({ success: true });
                 }
             }
-            else if(type==="delete"){
-                const {deletedCount} = await ordersCollection.deleteOne({_id:ObjectID(orderId)})
-                if(deletedCount){
-                    return res.send({success:true})
+            else if (type === "delete") {
+                const { deletedCount } = await ordersCollection.deleteOne({ _id: ObjectID(orderId) })
+                if (deletedCount) {
+                    return res.send({ success: true })
                 }
             }
-            res.send({success:false})
+            res.send({ success: false })
         })
 
         // REVIEW SECTION
@@ -230,17 +257,36 @@ async function run() {
             }
         })
 
+
+        app.patch('/order/:id', verifyJWT, async(req, res) =>{ 
+            const id = req.params.id; 
+            const payment = req.body; 
+            const filter = {_id: ObjectID(id)}; 
+            const updatedDoc = { 
+                $set: { 
+                    paid: true, 
+                    transactionId: payment.transactionId 
+                } 
+            } 
+            const result = await paymentCollection.insertOne(payment); 
+            const updatedorder = await ordersCollection.updateOne(filter, updatedDoc); 
+            res.send(updatedorder); 
+        })
+
         // Placeorder
         app.post("/placeorder", async (req, res) => {
             const { user, address, phone, product } = req.body;
-            const { id, quantity } = product;
+            const { _id:id, quantity } = product;
+            console.log(product);
             const data = {
                 user,
                 productId: id,
                 quantity,
                 phone,
                 address,
-                status: false
+                paid: false,
+                transactionId :"",
+                product,
             }
             const query = { _id: ObjectID(id) }
             const productUpdate = await productCollection.updateOne(query, {
