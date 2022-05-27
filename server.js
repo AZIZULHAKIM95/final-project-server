@@ -148,7 +148,6 @@ async function run() {
         })
 
 
-        // Get My ordered Products
         app.get("/orders/:user", verifyJWT, async (req, res) => {
             const user = req.params.user;
             const decodedUser = req.decoded.email;
