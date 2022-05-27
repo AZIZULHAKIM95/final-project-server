@@ -138,7 +138,7 @@ async function run() {
 
         })
 
-        // Add new product
+
         app.post("/products", verifyJWT, verifyAdmin, async (req, res) => {
             const product = req.body;
             const result = await productCollection.insertOne(product);
