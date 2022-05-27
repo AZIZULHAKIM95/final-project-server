@@ -165,7 +165,6 @@ async function run() {
             }
         })
 
-        // Get A single product
         app.get('/order/:id', verifyJWT, async(req, res) =>{ 
             const id = req.params.id; 
             const query = {_id: ObjectID(id)}; 
