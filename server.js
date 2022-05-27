@@ -17,7 +17,7 @@ app.set("json spaces", 2)
 // MongoDB Credentials
 const admin = process.env.DB_USER;
 const password = process.env.DB_PASS;
-const uri = `mongodb+srv://${admin}:${password}@cluster0.qthbe.mongodb.net/myFirstDatabase?retryWrites=true&w=majority`;
+const uri = `mongodb+srv://${admin}:${password}@cluster0.fgok3.mongodb.net/?retryWrites=true&w=majority`;
 const client = new MongoClient(uri,
     {
         useNewUrlParser: true,
@@ -27,7 +27,7 @@ const client = new MongoClient(uri,
 
 
 
-// API ENDPOINTS
+// API ENDPOINT
 async function run() {
     try {
 
