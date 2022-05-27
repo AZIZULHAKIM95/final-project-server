@@ -120,7 +120,6 @@ async function run() {
             const query = {};
             const cursor = productCollection.find(query);
             const products = await cursor.toArray();
-            // console.log("Sending all products to client");
             res.status(200).json({
                 success: true,
                 data: products,
