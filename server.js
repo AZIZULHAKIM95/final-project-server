@@ -129,7 +129,7 @@ async function run() {
             });
         });
 
-        // Delete Product
+
         app.delete("/product/:id", verifyJWT, verifyAdmin, async (req, res) => {
             const productId = req.params.id;
             const result = await productCollection.deleteOne({ _id: ObjectID(productId) });
